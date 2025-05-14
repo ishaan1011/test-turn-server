@@ -6,7 +6,8 @@ const PORT = process.env.PORT || 3000;
 
 const allowedOrigins = [
   'https://webrtc-client-sigma.vercel.app',
-  'http://localhost:3000'
+  'http://localhost:3000',
+  'http://192.168.1.95:3000'
 ];
 
 app.use(cors({
