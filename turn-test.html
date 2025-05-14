@@ -14,7 +14,7 @@
     };
 
     async function getXirsysIceConfig() {
-        const response = await fetch('https://webrtc-signaling-server-8t73.onrender.com/ice');
+        const response = await fetch('https://test-turn-server-6e6x.onrender.com/ice');
         const data = await response.json();
         return data.iceServers;
     }
