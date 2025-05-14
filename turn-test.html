@@ -46,37 +46,42 @@
       };
 
       const pc = new RTCPeerConnection(config);
+
       pc.onicecandidate = e => {
         if (e.candidate) {
           signaling.send({ candidate: e.candidate });
         }
       };
+
       pc.onconnectionstatechange = () => {
         log(`Connection state: ${pc.connectionState}`);
       };
 
       signaling.onmessage = async msg => {
-        if (msg.answer) {
-          await pc.setRemoteDescription(new RTCSessionDescription(msg.answer));
-        } else if (msg.offer) {
+        if (msg.offer && pc.signalingState === 'stable') {
           await pc.setRemoteDescription(new RTCSessionDescription(msg.offer));
           const answer = await pc.createAnswer();
           await pc.setLocalDescription(answer);
           signaling.send({ answer });
+        } else if (msg.answer && pc.signalingState === 'have-local-offer') {
+          await pc.setRemoteDescription(new RTCSessionDescription(msg.answer));
         } else if (msg.candidate) {
           await pc.addIceCandidate(new RTCIceCandidate(msg.candidate));
         }
       };
 
-      // 👇 Check for any offer that might already exist
-      checkInitialMessage();
-
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-      signaling.send({ offer });
-
-      log('Offer sent. Open this page in another tab to complete the connection.');
+      // 👇 Check if an offer is already in storage
+      const existing = localStorage.getItem('webrtc-msg');
+      if (existing && JSON.parse(existing).offer) {
+        signaling.onmessage(JSON.parse(existing)); // act as callee
+      } else {
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        signaling.send({ offer });
+        log('Offer sent. Open this page in another tab to complete the connection.');
+      }
     };
+
   </script>
 </body>
 </html>
