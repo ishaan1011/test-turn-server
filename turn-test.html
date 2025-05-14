@@ -19,11 +19,19 @@
       onmessage: null
     };
 
+    function checkInitialMessage() {
+      const stored = localStorage.getItem('webrtc-msg');
+      if (stored && signaling.onmessage) {
+        signaling.onmessage(JSON.parse(stored));
+      }
+    }
+
     window.addEventListener('storage', event => {
       if (event.key === 'webrtc-msg' && signaling.onmessage) {
         signaling.onmessage(JSON.parse(event.newValue));
       }
     });
+
 
     async function getIceServers() {
       const res = await fetch('https://test-turn-server-6e6x.onrender.com/ice');
@@ -59,6 +67,9 @@
           await pc.addIceCandidate(new RTCIceCandidate(msg.candidate));
         }
       };
+
+      // 👇 Check for any offer that might already exist
+      checkInitialMessage();
 
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
