@@ -6,12 +6,18 @@
 <body>
   <h2>TURN-only Peer Test</h2>
   <button id="start">Start Connection</button>
-  <pre id="log"></pre>
+  <div id="status" style="margin: 10px 0; font-weight: bold;"></div>
+  <pre id="log" style="background:#f4f4f4;padding:10px;border:1px solid #ccc;max-width:600px;"></pre>
 
   <script>
+    const status = document.getElementById('status');
     const log = msg => {
       console.log(msg);
       document.getElementById('log').textContent += msg + '\n';
+    };
+    const setStatus = (text, color) => {
+      status.textContent = text;
+      status.style.color = color;
     };
 
     const signaling = {
@@ -32,7 +38,6 @@
       }
     });
 
-
     async function getIceServers() {
       const res = await fetch('https://test-turn-server-6e6x.onrender.com/ice');
       const data = await res.json();
@@ -40,6 +45,8 @@
     }
 
     document.getElementById('start').onclick = async () => {
+      setStatus('Connecting...', 'orange');
+
       const config = {
         iceServers: await getIceServers(),
         iceTransportPolicy: 'relay'
@@ -49,12 +56,24 @@
 
       pc.onicecandidate = e => {
         if (e.candidate) {
+          const label = e.candidate.candidate.includes('typ relay') ? '✅ RELAY' : '⚠️ NON-RELAY';
+          log(`[ICE] ${label}: ${e.candidate.candidate}`);
           signaling.send({ candidate: e.candidate });
         }
       };
 
       pc.onconnectionstatechange = () => {
         log(`Connection state: ${pc.connectionState}`);
+        switch (pc.connectionState) {
+          case 'connected':
+          case 'completed':
+            setStatus('✅ TURN connection established', 'green');
+            break;
+          case 'failed':
+          case 'disconnected':
+            setStatus('❌ Connection failed', 'red');
+            break;
+        }
       };
 
       signaling.onmessage = async msg => {
@@ -63,25 +82,28 @@
           const answer = await pc.createAnswer();
           await pc.setLocalDescription(answer);
           signaling.send({ answer });
+          log('Answer sent.');
         } else if (msg.answer && pc.signalingState === 'have-local-offer') {
           await pc.setRemoteDescription(new RTCSessionDescription(msg.answer));
+          log('Answer received.');
         } else if (msg.candidate) {
           await pc.addIceCandidate(new RTCIceCandidate(msg.candidate));
         }
       };
 
-      // 👇 Check if an offer is already in storage
       const existing = localStorage.getItem('webrtc-msg');
       if (existing && JSON.parse(existing).offer) {
-        signaling.onmessage(JSON.parse(existing)); // act as callee
+        signaling.onmessage(JSON.parse(existing)); // callee
+        log('Offer detected. Responding...');
+        setStatus('Responding to peer...', 'blue');
       } else {
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
         signaling.send({ offer });
-        log('Offer sent. Open this page in another tab to complete the connection.');
+        log('Offer sent. Open this page in another tab or device.');
+        setStatus('Waiting for peer...', 'blue');
       }
     };
-
   </script>
 </body>
 </html>
