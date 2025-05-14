@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Xirsys TURN Test</title>
+</head>
+<body>
+  <h1>Xirsys TURN Server Test</h1>
+  <pre id="log"></pre>
+
+  <script>
+    const log = (msg) => {
+      console.log(msg);
+      document.getElementById('log').textContent += msg + '\n';
+    };
+
+    async function getXirsysIceConfig() {
+        const response = await fetch('https://webrtc-signaling-server-8t73.onrender.com/ice');
+        const data = await response.json();
+        return data.iceServers;
+    }
+
+
+
+    async function testTurnConnection() {
+      const iceServers = await getXirsysIceConfig();
+
+      const pc = new RTCPeerConnection({
+        iceServers,
+        iceTransportPolicy: 'relay'
+      });
+
+      pc.onicecandidate = async (event) => {
+        if (event.candidate) {
+          log(`[ICE] Candidate: ${event.candidate.candidate}`);
+        } else {
+          const stats = await pc.getStats();
+          const relays = [...stats.values()].filter(
+            s => s.type === 'remote-candidate' && s.candidateType === 'relay'
+          );
+          if (relays.length) {
+            log(`✅ TURN relay candidates gathered: ${relays.length}`);
+          } else {
+            log('❌ No TURN relay candidates gathered.');
+          }
+        }
+      };
+
+      // Dummy offer just to trigger ICE gathering
+      const offer = await pc.createOffer({ offerToReceiveAudio: true });
+      await pc.setLocalDescription(offer);
+    }
+
+    testTurnConnection().catch(err => log(`❌ Error: ${err.message}`));
+  </script>
+</body>
+</html>
